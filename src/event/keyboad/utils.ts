@@ -1,3 +1,4 @@
+import { TANK_ACTION } from "./constans";
 import type { OperatorEvenType } from "./type";
 
 export const isMoveType = (type: OperatorEvenType) => {
@@ -11,19 +12,19 @@ export const isAttackType = (type: OperatorEvenType) => {
 };
 
 export const getEventParams = (eType: OperatorEvenType) => {
-  let eventType = "attack",
+  let eventType = TANK_ACTION.ATTACK,
     eventParams = {};
   if (isAttackType(eType)) {
     eventType = eType;
   }
   if (isMoveType(eType)) {
-    eventType = "move";
+    eventType = TANK_ACTION.MOVE;
     eventParams = {
       isForward: eType === "forward",
     };
   }
   if (isRotateType(eType)) {
-    eventType = "rotate";
+    eventType = TANK_ACTION.ROTATE;
     eventParams = {
       isClockWise: eType === "clockwise",
     };

@@ -7,8 +7,8 @@
         width: tank.appearance.width + 'px',
         height: tank.appearance.height + 'px',
         background: 'red',
-        left: originX + tank.x + 'px',
-        top: originY - tank.y + 'px',
+        left: tank.x + 'px',
+        top:  tank.y + 'px',
         transform: `rotate(${-tank.dir}deg)`,
       }"
     >
@@ -23,11 +23,13 @@ import { GameManager } from "./core/manager";
 import { EPlayer } from "@/event/keyboad/constans";
 const testTank = new BasicTank({
   id: "lijian1",
-  x: -100,
+  x: 250,
+  y:500
 });
 const testTank2 = new BasicTank({
   id: "lijian2",
-  x: 100,
+  x: 500,
+  y:500
 });
 const refTank = ref(testTank);
 const refTank2 = ref(testTank2);

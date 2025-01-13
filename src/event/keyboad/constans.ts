@@ -19,3 +19,8 @@ export const DEFAULT_KEY_SETTINGS = {
     attack: "0",
   },
 };
+export const TANK_ACTION = {
+    MOVE: 'move',
+    ROTATE: 'rotate',
+    ATTACK: 'attack'
+}

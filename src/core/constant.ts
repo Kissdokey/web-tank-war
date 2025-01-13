@@ -5,3 +5,6 @@ export const INITIAL_TANK_GUN_HIGHT = 16;
 export const INITIAL_TANK_SPEED = 2;
 export const INITIAL_TANK_HEALTH = 100;
 export const INITIAL_TANKTE_ROTATE_SPEEAD = 1;
+
+export const INITIAL_BARRIER_WIDTH = 100;
+export const INITIAL_BARRIER_HEIGHT = 100;

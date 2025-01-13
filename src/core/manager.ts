@@ -8,6 +8,7 @@ import {
   type IMoveParams,
   type IRotateParams,
 } from "@/event/eventBus";
+import { BasicBarrier } from "./barrier/BasicBarrier";
 export interface Position {
   x: number;
   y: number;
@@ -15,20 +16,43 @@ export interface Position {
 export class GameManager {
   tankPositionMap: Map<string, Position> = new Map();
   tankContainer: Map<string, BasicTank> = new Map();
+  barrierContainer: Map<string, BasicBarrier> = new Map()
   animationMap: Map<string, boolean> = new Map();
-  constructor({ tankContainer }: { tankContainer: Map<string, BasicTank> }) {
+  constructor({ tankContainer, barrierContainer }: { tankContainer: Map<string, BasicTank>, barrierContainer: Map<string, BasicBarrier> }) {
     // 需要完成地图、地形障碍物、玩家坦克的初始化并传入，manager本身不负责初始化，但是负责各个物体的交互和信息传递
     this.tankContainer = tankContainer; // 这里为了响应式所以把ref监听的map传入进行初始化，这样修改ref即可界面更新
+    this.barrierContainer = barrierContainer
     this.init();
   }
   init() {
     // 并且完成各种键盘事件绑定
     this.bindKeyBoardEvent();
+    // 初始化场景
+    this.initTheme()
   }
   bindKeyBoardEvent() {
     tankEventBus.on("attack", this.handleAttack.bind(this));
     tankEventBus.on("move", this.handleMove.bind(this));
     tankEventBus.on("rotate", this.handleRotate.bind(this));
+  }
+  initTheme() {
+    // 初始化障碍物
+    this.initBarriers()
+  }
+  initBarriers() {
+    const testBarrier = new BasicBarrier({
+        x: 300,
+        y: 700
+    })
+    const testBarrier2 = new BasicBarrier({
+        x: 700,
+        y: 300
+    })
+    this.addBarrier(testBarrier)
+    this.addBarrier(testBarrier2)
+  }
+  addBarrier(barrier: BasicBarrier) {
+    this.barrierContainer.set(barrier.id, barrier)
   }
   addTank(tank: BasicTank, belongs?: EPlayer) {
     this.tankContainer.set(tank.id, tank);
@@ -38,7 +62,7 @@ export class GameManager {
     }
   }
   handleAttack(param: IAttackParams) {}
-  
+
   handleMove(param: IMoveParams) {
     const { target: tankid, isStart, isForward } = param;
     const animationKey = `${tankid}-move-${isForward ? "t" : "f"}`;

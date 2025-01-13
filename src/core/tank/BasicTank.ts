@@ -8,6 +8,7 @@ import {
   INITIAL_TANKTE_ROTATE_SPEEAD,
 } from "@/core/constant";
 import type { ITank, ITankAppearanceInfo } from "./interface";
+import { getUuid } from "@/helper/random/uuid";
 
 
 
@@ -23,7 +24,7 @@ export class BasicTank {
   x: number;
   y: number;
   constructor(initial?: ITank) {
-    this.id = initial?.id || "lijian";
+    this.id = initial?.id || getUuid();
     this.name = initial?.name || "tank";
     this.maxSpeed = initial?.maxSpeed || INITIAL_TANK_SPEED;
     this.rotateSpeed = initial?.rotateSpeed || INITIAL_TANKTE_ROTATE_SPEEAD;

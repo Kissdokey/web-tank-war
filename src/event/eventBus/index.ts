@@ -1,1 +1,1 @@
-export * from './TankEventBus'
+export * from './tankEventBus'

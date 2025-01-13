@@ -5,7 +5,7 @@ export interface ITankAppearanceInfo {
   gunHeight: number;
 }
 export interface IBasicTank {
-  id: string;
+  id?: string;
   name?: string;
   x?: number;
   y?: number;

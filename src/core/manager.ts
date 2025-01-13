@@ -1,8 +1,9 @@
 // 考虑将各种对象类传入，内部进行初始化， or依赖倒置，将对象直接传入
-import { EPlayer, keyBoardManager } from "@/event/keyboard";
+import { keyBoardManager } from "@/event/keyboad/keyboard";
+import { EPlayer } from "@/event/keyboad/constans";
 import type { BasicTank } from "./tank/BasicTank";
 import {
-  keyboardEventBus,
+  tankEventBus,
   type IAttackParams,
   type IMoveParams,
   type IRotateParams,
@@ -29,9 +30,9 @@ export class GameManager {
     this.bindKeyBoardEvent();
   }
   bindKeyBoardEvent() {
-    keyboardEventBus.on("attack", this.handleAttack.bind(this));
-    keyboardEventBus.on("move", this.handleMove.bind(this));
-    keyboardEventBus.on("rotate", this.handleRotate.bind(this));
+    tankEventBus.on("attack", this.handleAttack.bind(this));
+    tankEventBus.on("move", this.handleMove.bind(this));
+    tankEventBus.on("rotate", this.handleRotate.bind(this));
   }
   addTank(tank: BasicTank, belongs?: EPlayer) {
     this.tankContainer.set(tank.id, tank);

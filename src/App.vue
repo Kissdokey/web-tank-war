@@ -20,7 +20,7 @@
 import { BasicTank } from "@/core/tank/BasicTank";
 import { ref } from "vue";
 import { GameManager } from "./core/manager";
-import { EPlayer } from "./event/keyboard";
+import { EPlayer } from "@/event/keyboad/constans";
 const testTank = new BasicTank({
   id: "lijian1",
   x: -100,

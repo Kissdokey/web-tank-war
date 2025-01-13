@@ -2,6 +2,7 @@
   <template v-for="[barrierid, barrier] in bContainer" :key="barrierid">
     <div
       class="barrier"
+      :id="barrierid"
       :style="{
         position: 'absolute',
         width: barrier.width + 'px',
@@ -15,9 +16,9 @@
     </div>
   </template>
   <template v-for="[tankid, tank] in container" :key="tankid">
-    {{ tank }}
     <div
       class="tank"
+      :id="tankid"
       :style="{
         width: tank.appearance.width + 'px',
         height: tank.appearance.height + 'px',

@@ -9,6 +9,8 @@ import {
   type IRotateParams,
 } from "@/event/eventBus";
 import { BasicBarrier } from "./barrier/BasicBarrier";
+import { checkRectSatCollission, preCheckCollision } from "@/helper/collision";
+import { clone } from "lodash";
 export interface Position {
   x: number;
   y: number;
@@ -16,19 +18,25 @@ export interface Position {
 export class GameManager {
   tankPositionMap: Map<string, Position> = new Map();
   tankContainer: Map<string, BasicTank> = new Map();
-  barrierContainer: Map<string, BasicBarrier> = new Map()
+  barrierContainer: Map<string, BasicBarrier> = new Map();
   animationMap: Map<string, boolean> = new Map();
-  constructor({ tankContainer, barrierContainer }: { tankContainer: Map<string, BasicTank>, barrierContainer: Map<string, BasicBarrier> }) {
+  constructor({
+    tankContainer,
+    barrierContainer,
+  }: {
+    tankContainer: Map<string, BasicTank>;
+    barrierContainer: Map<string, BasicBarrier>;
+  }) {
     // 需要完成地图、地形障碍物、玩家坦克的初始化并传入，manager本身不负责初始化，但是负责各个物体的交互和信息传递
     this.tankContainer = tankContainer; // 这里为了响应式所以把ref监听的map传入进行初始化，这样修改ref即可界面更新
-    this.barrierContainer = barrierContainer
+    this.barrierContainer = barrierContainer;
     this.init();
   }
   init() {
     // 并且完成各种键盘事件绑定
     this.bindKeyBoardEvent();
     // 初始化场景
-    this.initTheme()
+    this.initTheme();
   }
   bindKeyBoardEvent() {
     tankEventBus.on("attack", this.handleAttack.bind(this));
@@ -37,22 +45,22 @@ export class GameManager {
   }
   initTheme() {
     // 初始化障碍物
-    this.initBarriers()
+    this.initBarriers();
   }
   initBarriers() {
     const testBarrier = new BasicBarrier({
-        x: 300,
-        y: 700
-    })
+      x: 300,
+      y: 700,
+    });
     const testBarrier2 = new BasicBarrier({
-        x: 700,
-        y: 300
-    })
-    this.addBarrier(testBarrier)
-    this.addBarrier(testBarrier2)
+      x: 700,
+      y: 300,
+    });
+    this.addBarrier(testBarrier);
+    this.addBarrier(testBarrier2);
   }
   addBarrier(barrier: BasicBarrier) {
-    this.barrierContainer.set(barrier.id, barrier)
+    this.barrierContainer.set(barrier.id, barrier);
   }
   addTank(tank: BasicTank, belongs?: EPlayer) {
     this.tankContainer.set(tank.id, tank);
@@ -78,6 +86,12 @@ export class GameManager {
         const deg = (tank.dir / 180) * Math.PI;
         let nextX = x + Math.cos(deg) * frameDistance;
         let nextY = y - Math.sin(deg) * frameDistance;
+        const cloneTank = clone(tank);
+        (cloneTank.x = nextX), (cloneTank.y = nextY);
+        let isHit = this.checkTankCollission(cloneTank);
+        if (isHit) {
+          return;
+        }
         tank.x = nextX;
         tank.y = nextY;
       }
@@ -94,6 +108,12 @@ export class GameManager {
         const currentDir = tank.dir;
         const delta = isClockWise ? -tank.rotateSpeed : tank.rotateSpeed;
         const nextDir = (currentDir + delta + 360) % 360;
+        const cloneTank = clone(tank);
+        cloneTank.dir = nextDir
+        let isHit = this.checkTankCollission(cloneTank);
+        if (isHit) {
+          return;
+        }
         tank.dir = nextDir;
       }
     };
@@ -119,5 +139,52 @@ export class GameManager {
     };
     this.animationMap.set(animationKey, true);
     window.requestAnimationFrame(animationFn);
+  }
+  checkTankCollission(tank: BasicTank) {
+    // 遍历坦克，判断碰撞
+    let isHitTank = false;
+    const tankRectInfo = {
+      x: tank.x,
+      y: tank.y,
+      width: tank.appearance.width,
+      height: tank.appearance.height,
+      deg: tank.dir,
+    };
+    this.tankContainer.forEach((_tank, _) => {
+      if (tank.id === _tank.id) {
+        return;
+      }
+      let isAabbHit = preCheckCollision(tank.id, _tank.id);
+      if (!isAabbHit) return;
+      const isSatHit = checkRectSatCollission(tankRectInfo, {
+        x: _tank.x,
+        y: _tank.y,
+        width: _tank.appearance.width,
+        height: _tank.appearance.height,
+        deg: _tank.dir,
+      });
+      if (isSatHit) {
+        console.log("sat hit");
+        isHitTank = true;
+      }
+    });
+    // 遍历障碍物，判断碰撞
+    //TODO，优化算法减少计算
+    let isHitBarrier = false;
+    this.barrierContainer.forEach((barrier, _) => {
+      let isAabbHit = preCheckCollision(tank.id, barrier.id);
+      if (!isAabbHit) return;
+      const isSatHit = checkRectSatCollission(tankRectInfo, {
+        x: barrier.x,
+        y: barrier.y,
+        width: barrier.width,
+        height: barrier.height,
+      });
+      if (isSatHit) {
+        console.log("sat hit");
+        isHitTank = true;
+      }
+    });
+    return isHitTank || isHitBarrier;
   }
 }

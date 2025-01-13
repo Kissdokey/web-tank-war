@@ -12,11 +12,11 @@ export const DEFAULT_KEY_SETTINGS = {
     attack: " ",
   },
   [EPlayer.PLAYER2]: {
-    forward: "ArrowUp",
-    backward: "ArrowDown",
-    clockwise: "ArrowRight",
-    counterclockwise: "ArrowLeft",
-    attack: "0",
+    forward: "i",
+    backward: "k",
+    clockwise: "l",
+    counterclockwise: "j",
+    attack: "Enter",
   },
 };
 export const TANK_ACTION = {

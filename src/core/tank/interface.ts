@@ -1,6 +1,4 @@
 export interface ITankAppearanceInfo {
-  width: number;
-  height: number;
   gunWidth: number;
   gunHeight: number;
 }
@@ -13,8 +11,11 @@ export interface IBasicTank {
   dir?: number;
   rotateSpeed?: number;
   health?: number;
+  width?: number;
+  height?: number;
   appearance?: ITankAppearanceInfo;
   inerti?: number;
+  attackInterval?: number
 }
 
 export interface ITank extends IBasicTank {}

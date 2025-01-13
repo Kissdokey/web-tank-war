@@ -42,7 +42,7 @@ function project(rect: Rectangle, axis: Point): [number, number] {
 
 function overlap(proj1: [number, number], proj2: [number, number]): boolean {
   // 检测两个投影是否重叠
-  return !(proj1[1] < proj2[0] || proj2[1] < proj1[0]);
+  return !(proj1[1] <= proj2[0] || proj2[1] <= proj1[0]);
 }
 
 export function getRectFromTopLeft(x = 0, y = 0, width = 0, height = 0): Point[] {

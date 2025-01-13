@@ -1,7 +1,7 @@
 // 考虑将各种对象类传入，内部进行初始化， or依赖倒置，将对象直接传入
 import { keyBoardManager } from "@/event/keyboad/keyboard";
 import { EPlayer } from "@/event/keyboad/constans";
-import type { BasicTank } from "./tank/BasicTank";
+import { BasicTank } from "./tank/BasicTank";
 import {
   tankEventBus,
   type IAttackParams,
@@ -11,6 +11,8 @@ import {
 import { BasicBarrier } from "./barrier/BasicBarrier";
 import { checkRectSatCollission, preCheckCollision } from "@/helper/collision";
 import { clone } from "lodash";
+import { BasicBullet } from "./bullet/BasicBullet";
+import { INITIAL_BULLET_SIZE } from "./constant";
 export interface Position {
   x: number;
   y: number;
@@ -18,18 +20,23 @@ export interface Position {
 export class GameManager {
   tankPositionMap: Map<string, Position> = new Map();
   tankContainer: Map<string, BasicTank> = new Map();
+  bulletContainer: Map<string, BasicBullet> = new Map();
   barrierContainer: Map<string, BasicBarrier> = new Map();
   animationMap: Map<string, boolean> = new Map();
+  tankAttackRecordMap: Map<string, number> = new Map();
   constructor({
     tankContainer,
     barrierContainer,
+    bulletContainer,
   }: {
     tankContainer: Map<string, BasicTank>;
     barrierContainer: Map<string, BasicBarrier>;
+    bulletContainer: Map<string, BasicBullet>;
   }) {
     // 需要完成地图、地形障碍物、玩家坦克的初始化并传入，manager本身不负责初始化，但是负责各个物体的交互和信息传递
     this.tankContainer = tankContainer; // 这里为了响应式所以把ref监听的map传入进行初始化，这样修改ref即可界面更新
     this.barrierContainer = barrierContainer;
+    this.bulletContainer = bulletContainer;
     this.init();
   }
   init() {
@@ -37,6 +44,8 @@ export class GameManager {
     this.bindKeyBoardEvent();
     // 初始化场景
     this.initTheme();
+    // 初始化子弹动画执行函数
+    this.initBulletAnimation();
   }
   bindKeyBoardEvent() {
     tankEventBus.on("attack", this.handleAttack.bind(this));
@@ -56,8 +65,36 @@ export class GameManager {
       x: 700,
       y: 300,
     });
+    const testBarrier3 = new BasicBarrier({
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 20,
+    });
+    const testBarrier4 = new BasicBarrier({
+      x: 0,
+      y: 980,
+      width: 1000,
+      height: 20,
+    });
+    const testBarrier5 = new BasicBarrier({
+      x: 0,
+      y: 20,
+      width: 20,
+      height: 960,
+    });
+    const testBarrier6 = new BasicBarrier({
+      x: 1000,
+      y: 0,
+      width: 20,
+      height: 1000,
+    });
     this.addBarrier(testBarrier);
     this.addBarrier(testBarrier2);
+    this.addBarrier(testBarrier3);
+    this.addBarrier(testBarrier4);
+    this.addBarrier(testBarrier5);
+    this.addBarrier(testBarrier6);
   }
   addBarrier(barrier: BasicBarrier) {
     this.barrierContainer.set(barrier.id, barrier);
@@ -69,7 +106,33 @@ export class GameManager {
       keyBoardManager.bindPlayerTank(belongs, tank.id);
     }
   }
-  handleAttack(param: IAttackParams) {}
+  handleAttack(param: IAttackParams) {
+    // 每隔一段时间发射一个子弹
+    const { target: tankid, isStart } = param;
+    if (!isStart) return;
+    const tank = this.tankContainer.get(tankid);
+    if (!tank) return;
+    const lastAttackTime = this.tankAttackRecordMap.get(tank.id);
+    const now = new Date().getTime();
+    // 攻击间隔内返回
+    if (lastAttackTime && now - lastAttackTime <= tank.attackInterval) {
+      return;
+    }
+    const size = INITIAL_BULLET_SIZE;
+    const tankCenter = {
+      x: tank.x + tank.width / 2,
+      y: tank.y + tank.height / 2,
+    };
+    const cos = Math.cos((tank.dir * Math.PI) / 180);
+    const sin = Math.sin((tank.dir * Math.PI) / 180);
+    const bullet = new BasicBullet({
+      x: tankCenter.x + (tank.height / 2) * cos - size / 2,
+      y: tankCenter.y - (tank.height / 2) * sin - size / 2,
+      dir: tank.dir,
+    });
+    this.bulletContainer.set(bullet.id, bullet);
+    this.tankAttackRecordMap.set(tank.id, now);
+  }
 
   handleMove(param: IMoveParams) {
     const { target: tankid, isStart, isForward } = param;
@@ -77,10 +140,6 @@ export class GameManager {
     const moveCb = () => {
       const tank = this.tankContainer.get(tankid);
       if (tank) {
-        // 根据坦克的资料计算它下一帧的位置
-        // 根据计算出来的位置，和全局其他物品的状态，进行碰撞检测// 静态物体直接判断即可， 动态物体则需要多一步
-        // 检测完毕对位置进行可能的矫正
-        // 更新坦克位置
         const { x, y } = tank;
         const frameDistance = isForward ? tank.maxSpeed : -tank.maxSpeed;
         const deg = (tank.dir / 180) * Math.PI;
@@ -109,7 +168,7 @@ export class GameManager {
         const delta = isClockWise ? -tank.rotateSpeed : tank.rotateSpeed;
         const nextDir = (currentDir + delta + 360) % 360;
         const cloneTank = clone(tank);
-        cloneTank.dir = nextDir
+        cloneTank.dir = nextDir;
         let isHit = this.checkTankCollission(cloneTank);
         if (isHit) {
           return;
@@ -119,7 +178,36 @@ export class GameManager {
     };
     this.handleAnimation(animationKey, isStart, rotate);
   }
+  initBulletAnimation() {
+    const bulletAnimationKey = "bullet-animation";
+    const bulletAnimationCb = () => {
+      const hitTankCb = ()=> {
 
+      }
+      this.bulletContainer.forEach((bullet, bulletid) => {
+        const { x, y } = bullet;
+        const frameDistance = bullet.speed;
+        const deg = (bullet.dir / 180) * Math.PI;
+        let nextX = x + Math.cos(deg) * frameDistance;
+        let nextY = y - Math.sin(deg) * frameDistance;
+        const cloneBullet = clone(bullet);
+        cloneBullet.x = nextX;
+        cloneBullet.y = nextY;
+        let isHit = this.checkTankCollission(cloneBullet, {
+          hitTankCb: (tankid)=> {
+            this.handleBulletHitTank(tankid, bulletid)
+          }
+        });
+        if (isHit) {
+          this.bulletContainer.delete(bullet.id);
+          return;
+        }
+        bullet.x = nextX;
+        bullet.y = nextY;
+      });
+    };
+    this.handleAnimation(bulletAnimationKey, true, bulletAnimationCb);
+  }
   handleAnimation(animationKey: string, isStart: boolean, cb: () => void) {
     const isAnimating = this.animationMap.get(animationKey);
     if (!isStart) {
@@ -140,41 +228,48 @@ export class GameManager {
     this.animationMap.set(animationKey, true);
     window.requestAnimationFrame(animationFn);
   }
-  checkTankCollission(tank: BasicTank) {
+  checkTankCollission(
+    obj: BasicTank | BasicBullet,
+    cb?: {
+      hitTankCb?: (tankid: string) => void;
+      hitBarrierCb?: (barrierid: string) => void;
+    }
+  ) {
     // 遍历坦克，判断碰撞
-    let isHitTank = false;
-    const tankRectInfo = {
-      x: tank.x,
-      y: tank.y,
-      width: tank.appearance.width,
-      height: tank.appearance.height,
-      deg: tank.dir,
+    let isHitTank = false, tankid = '', barrierid = ''
+    const objRectInfo = {
+      x: obj.x,
+      y: obj.y,
+      width: obj.width,
+      height: obj.height,
+      deg: obj.dir,
     };
     this.tankContainer.forEach((_tank, _) => {
-      if (tank.id === _tank.id) {
+      if (obj.id === _tank.id) {
         return;
       }
-      let isAabbHit = preCheckCollision(tank.id, _tank.id);
+      let isAabbHit = preCheckCollision(obj.id, _tank.id);
       if (!isAabbHit) return;
-      const isSatHit = checkRectSatCollission(tankRectInfo, {
+      const isSatHit = checkRectSatCollission(objRectInfo, {
         x: _tank.x,
         y: _tank.y,
-        width: _tank.appearance.width,
-        height: _tank.appearance.height,
+        width: _tank.width,
+        height: _tank.height,
         deg: _tank.dir,
       });
       if (isSatHit) {
         console.log("sat hit");
         isHitTank = true;
+        tankid = _tank.id
       }
     });
     // 遍历障碍物，判断碰撞
     //TODO，优化算法减少计算
     let isHitBarrier = false;
     this.barrierContainer.forEach((barrier, _) => {
-      let isAabbHit = preCheckCollision(tank.id, barrier.id);
+      let isAabbHit = preCheckCollision(obj.id, barrier.id);
       if (!isAabbHit) return;
-      const isSatHit = checkRectSatCollission(tankRectInfo, {
+      const isSatHit = checkRectSatCollission(objRectInfo, {
         x: barrier.x,
         y: barrier.y,
         width: barrier.width,
@@ -183,8 +278,22 @@ export class GameManager {
       if (isSatHit) {
         console.log("sat hit");
         isHitTank = true;
+        barrierid = barrier.id
       }
     });
+    isHitBarrier && cb?.hitBarrierCb && cb?.hitBarrierCb(barrierid);
+    isHitTank && cb?.hitTankCb && cb?.hitTankCb(tankid);
     return isHitTank || isHitBarrier;
+  }
+  handleBulletHitTank(tankid: string, bulletid: string) {
+    const tank = this.tankContainer.get(tankid)
+    const bullet = this.bulletContainer.get(bulletid)
+    if(!tank || !bullet) return 
+    const remainHealth = tank.health - bullet.damage
+    if(remainHealth <= 0) {
+      this.tankContainer.delete(tankid)
+      return
+    } 
+    tank.health = remainHealth
   }
 }

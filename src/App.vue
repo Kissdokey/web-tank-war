@@ -17,7 +17,7 @@
   </template>
 </template>
 <script setup lang="ts">
-import { BasicTank } from "@/core/tank/BasicTank";
+import { BasicTank, EpTank } from "@/core/tank/BasicTank";
 import { ref } from "vue";
 import { GameManager } from "./core/manager";
 import { EPlayer } from "@/event/keyboad/constans";
@@ -26,7 +26,7 @@ const testTank = new BasicTank({
   x: 250,
   y:500
 });
-const testTank2 = new BasicTank({
+const testTank2 = new EpTank({
   id: "lijian2",
   x: 500,
   y:500

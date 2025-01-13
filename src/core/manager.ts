@@ -9,7 +9,13 @@ import {
   type IRotateParams,
 } from "@/event/eventBus";
 import { BasicBarrier } from "./barrier/BasicBarrier";
-import { checkRectSatCollission, preCheckCollision } from "@/helper/collision";
+import {
+  checkRectSatCollission,
+  getRectFromTopLeft,
+  getReflectedAngle,
+  getShortestVector,
+  preCheckCollision,
+} from "@/helper/collision";
 import { clone } from "lodash";
 import { BasicBullet } from "./bullet/BasicBullet";
 import { INITIAL_BULLET_SIZE } from "./constant";
@@ -181,12 +187,15 @@ export class GameManager {
   initBulletAnimation() {
     const bulletAnimationKey = "bullet-animation";
     const bulletAnimationCb = () => {
-      const hitTankCb = ()=> {
-
-      }
       this.bulletContainer.forEach((bullet, bulletid) => {
         const { x, y } = bullet;
         const frameDistance = bullet.speed;
+        bullet.maxRange -= frameDistance;
+        // 超出最远射程直接销毁
+        if (bullet.maxRange <= 0) {
+          this.bulletContainer.delete(bullet.id);
+          return;
+        }
         const deg = (bullet.dir / 180) * Math.PI;
         let nextX = x + Math.cos(deg) * frameDistance;
         let nextY = y - Math.sin(deg) * frameDistance;
@@ -194,12 +203,15 @@ export class GameManager {
         cloneBullet.x = nextX;
         cloneBullet.y = nextY;
         let isHit = this.checkTankCollission(cloneBullet, {
-          hitTankCb: (tankid)=> {
-            this.handleBulletHitTank(tankid, bulletid)
-          }
+          hitTankCb: (tankid) => {
+            this.handleBulletHitTank(tankid, bulletid);
+            this.bulletContainer.delete(bullet.id);
+          },
+          hitBarrierCb: (barrierid)=> {
+            this.handleBulletHitBarrier(barrierid, bulletid)
+          },
         });
         if (isHit) {
-          this.bulletContainer.delete(bullet.id);
           return;
         }
         bullet.x = nextX;
@@ -236,7 +248,9 @@ export class GameManager {
     }
   ) {
     // 遍历坦克，判断碰撞
-    let isHitTank = false, tankid = '', barrierid = ''
+    let isHitTank = false,
+      tankid = "",
+      barrierid = "";
     const objRectInfo = {
       x: obj.x,
       y: obj.y,
@@ -260,7 +274,7 @@ export class GameManager {
       if (isSatHit) {
         console.log("sat hit");
         isHitTank = true;
-        tankid = _tank.id
+        tankid = _tank.id;
       }
     });
     // 遍历障碍物，判断碰撞
@@ -277,8 +291,8 @@ export class GameManager {
       });
       if (isSatHit) {
         console.log("sat hit");
-        isHitTank = true;
-        barrierid = barrier.id
+        isHitBarrier = true;
+        barrierid = barrier.id;
       }
     });
     isHitBarrier && cb?.hitBarrierCb && cb?.hitBarrierCb(barrierid);
@@ -286,14 +300,47 @@ export class GameManager {
     return isHitTank || isHitBarrier;
   }
   handleBulletHitTank(tankid: string, bulletid: string) {
-    const tank = this.tankContainer.get(tankid)
-    const bullet = this.bulletContainer.get(bulletid)
-    if(!tank || !bullet) return 
-    const remainHealth = tank.health - bullet.damage
-    if(remainHealth <= 0) {
-      this.tankContainer.delete(tankid)
-      return
-    } 
-    tank.health = remainHealth
+    const tank = this.tankContainer.get(tankid);
+    const bullet = this.bulletContainer.get(bulletid);
+    if (!tank || !bullet) return;
+    const remainHealth = tank.health - bullet.damage;
+    if (remainHealth <= 0) {
+      this.tankContainer.delete(tankid);
+      return;
+    }
+    tank.health = remainHealth;
+  }
+  handleBulletHitBarrier(barrierid: string, bulletid: string) {
+    const barrier = this.barrierContainer.get(barrierid);
+    const bullet = this.bulletContainer.get(bulletid);
+    if (!barrier || !bullet) return;
+    bullet.maxReflection -= 1;
+    if (bullet.maxReflection < 0) {
+      this.bulletContainer.delete(bulletid);
+      return;
+    }
+    // 确定碰撞的墙面向量，然后将子弹方向反弹
+    const barrierCorners = getRectFromTopLeft(
+      barrier.x,
+      barrier.y,
+      barrier.width,
+      barrier.height
+    ).map(([x, y]) => {
+      return {
+        x,
+        y,
+      };
+    });
+    const barrierVector = getShortestVector(
+      {
+        x: bullet.x,
+        y: bullet.y,
+      },
+      {
+        corners: barrierCorners,
+      }
+    );
+    bullet.dir = (getReflectedAngle(bullet.dir, barrierVector) + 180) % 360;
+    console.log(barrierCorners, barrierVector, bullet.dir)
   }
 }

@@ -1,7 +1,7 @@
-export interface IBasicBullet {
+import type { BasicObject } from "../interface"
+
+export interface IBasicBullet extends BasicObject{
     id?: string
-    x: number
-    y: number 
     size?: number
     damage?: number
     speed?: number

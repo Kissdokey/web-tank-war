@@ -11,14 +11,12 @@ import {
 import { BasicBarrier } from "./barrier/BasicBarrier";
 import {
   checkRectSatCollission,
-  getRectFromTopLeft,
-  getReflectedAngle,
-  getShortestVector,
   preCheckCollision,
 } from "@/helper/collision";
 import { clone } from "lodash";
 import { BasicBullet } from "./bullet/BasicBullet";
 import { INITIAL_BULLET_SIZE } from "./constant";
+import { calculateReflectionAngle } from "@/helper/collision/reflection";
 export interface Position {
   x: number;
   y: number;
@@ -30,6 +28,7 @@ export class GameManager {
   barrierContainer: Map<string, BasicBarrier> = new Map();
   animationMap: Map<string, boolean> = new Map();
   tankAttackRecordMap: Map<string, number> = new Map();
+  bulletHitBarrierMap: Map<string, boolean> = new Map()
   constructor({
     tankContainer,
     barrierContainer,
@@ -132,8 +131,8 @@ export class GameManager {
     const cos = Math.cos((tank.dir * Math.PI) / 180);
     const sin = Math.sin((tank.dir * Math.PI) / 180);
     const bullet = new BasicBullet({
-      x: tankCenter.x + (tank.height / 2) * cos - size / 2,
-      y: tankCenter.y - (tank.height / 2) * sin - size / 2,
+      x: tankCenter.x + (tank.height / 2 + size  * 2) * cos - size / 2,
+      y: tankCenter.y - (tank.height / 2 + size  * 2) * sin - size / 2,
       dir: tank.dir,
     });
     this.bulletContainer.set(bullet.id, bullet);
@@ -201,18 +200,29 @@ export class GameManager {
         let nextY = y - Math.sin(deg) * frameDistance;
         const cloneBullet = clone(bullet);
         cloneBullet.x = nextX;
+        cloneBullet.dir = 0
         cloneBullet.y = nextY;
         let isHit = this.checkTankCollission(cloneBullet, {
           hitTankCb: (tankid) => {
             this.handleBulletHitTank(tankid, bulletid);
             this.bulletContainer.delete(bullet.id);
           },
-          hitBarrierCb: (barrierid)=> {
-            this.handleBulletHitBarrier(barrierid, bulletid)
+          hitBarrierCb: (barrierid, vector) => {
+            this.handleBulletHitBarrier(barrierid, bulletid, vector);
           },
         });
+        if (isHit && !this.bulletHitBarrierMap.has(bullet.id)) {
+          this.bulletHitBarrierMap.set(bullet.id, true)
+          // 同时回退一帧
+          bullet.x = x - Math.cos(deg) * frameDistance;
+          bullet.y = y + Math.sin(deg) * frameDistance;
+          return
+        }
+        !isHit && this.bulletHitBarrierMap.delete(bullet.id)
         if (isHit) {
-          return;
+          // 加大前移动突破障碍
+          nextX = x + Math.cos(deg) * bullet.size * 2;
+          nextY = y - Math.sin(deg) * bullet.size * 2;
         }
         bullet.x = nextX;
         bullet.y = nextY;
@@ -244,11 +254,12 @@ export class GameManager {
     obj: BasicTank | BasicBullet,
     cb?: {
       hitTankCb?: (tankid: string) => void;
-      hitBarrierCb?: (barrierid: string) => void;
+      hitBarrierCb?: (barrierid: string, vector: {x: number, y: number}) => void;
     }
   ) {
     // 遍历坦克，判断碰撞
     let isHitTank = false,
+      hitBarrierVect ={x: 0,y:0},
       tankid = "",
       barrierid = "";
     const objRectInfo = {
@@ -257,6 +268,7 @@ export class GameManager {
       width: obj.width,
       height: obj.height,
       deg: obj.dir,
+      isRadius: obj.isRadius
     };
     this.tankContainer.forEach((_tank, _) => {
       if (obj.id === _tank.id) {
@@ -270,8 +282,9 @@ export class GameManager {
         width: _tank.width,
         height: _tank.height,
         deg: _tank.dir,
+        isRadius: false
       });
-      if (isSatHit) {
+      if (isSatHit.isCollision) {
         console.log("sat hit");
         isHitTank = true;
         tankid = _tank.id;
@@ -288,14 +301,16 @@ export class GameManager {
         y: barrier.y,
         width: barrier.width,
         height: barrier.height,
+        isRadius: false
       });
-      if (isSatHit) {
+      if (isAabbHit) {
         console.log("sat hit");
         isHitBarrier = true;
+        hitBarrierVect = isSatHit.vector || {x: 0,y:0}
         barrierid = barrier.id;
       }
     });
-    isHitBarrier && cb?.hitBarrierCb && cb?.hitBarrierCb(barrierid);
+    isHitBarrier && cb?.hitBarrierCb && cb?.hitBarrierCb(barrierid, hitBarrierVect);
     isHitTank && cb?.hitTankCb && cb?.hitTankCb(tankid);
     return isHitTank || isHitBarrier;
   }
@@ -310,7 +325,7 @@ export class GameManager {
     }
     tank.health = remainHealth;
   }
-  handleBulletHitBarrier(barrierid: string, bulletid: string) {
+  handleBulletHitBarrier(barrierid: string, bulletid: string, vector: {x: number,y: number}) {
     const barrier = this.barrierContainer.get(barrierid);
     const bullet = this.bulletContainer.get(bulletid);
     if (!barrier || !bullet) return;
@@ -320,27 +335,11 @@ export class GameManager {
       return;
     }
     // 确定碰撞的墙面向量，然后将子弹方向反弹
-    const barrierCorners = getRectFromTopLeft(
-      barrier.x,
-      barrier.y,
-      barrier.width,
-      barrier.height
-    ).map(([x, y]) => {
-      return {
-        x,
-        y,
-      };
-    });
-    const barrierVector = getShortestVector(
-      {
-        x: bullet.x,
-        y: bullet.y,
-      },
-      {
-        corners: barrierCorners,
-      }
-    );
-    bullet.dir = (getReflectedAngle(bullet.dir, barrierVector) + 180) % 360;
-    console.log(barrierCorners, barrierVector, bullet.dir)
+    let nextDir = calculateReflectionAngle(bullet.dir, {
+      x: vector.x,
+      y: -vector.y
+    })
+    bullet.dir = nextDir
+    console.log(nextDir, bullet.dir)
   }
 }

@@ -13,5 +13,5 @@ export const INITIAL_BARRIER_HEIGHT = 100;
 export const INITIAL_BULLET_SIZE = 8;
 export const INITIAL_BULLET_SPEED = 6;
 export const INITIAL_BULLET_DAMAGE = 50;
-export const MAX_BULLET_RANGE = 600
-export const MAX_BULLET_REFLECTION_TIMES = 3 // 最大反射三次，第四次碰上障碍物直接爆炸
+export const MAX_BULLET_RANGE = 60000
+export const MAX_BULLET_REFLECTION_TIMES = 100 // 最大反射三次，第四次碰上障碍物直接爆炸

@@ -1,5 +1,7 @@
 // 初始版本坦克视作会旋转的矩形，障碍物也是矩形，这样子可以采用SAT(分离轴定理)来对两个矩形进行精确的判断相交，其中可以使用AABB进行初次筛选.暂时不考虑碰撞检测后的位置纠正
 
+import { satCollision } from "./sat";
+
 export const preCheckCollision = (id1: string, id2: string) => {
   const dom1 = document.getElementById(`${id1}`);
   const dom2 = document.getElementById(`${id2}`);
@@ -18,32 +20,8 @@ export const preCheckCollision = (id1: string, id2: string) => {
 };
 
 type Point = [number, number];
-type Rectangle = Point[];
 
-function getAxes(rect: Rectangle): Point[] {
-  // 获取矩形的所有分离轴
-  const axes: Point[] = [];
-  for (let i = 0; i < rect.length; i++) {
-    const p1 = rect[i];
-    const p2 = rect[(i + 1) % rect.length];
-    const edge: Point = [p2[0] - p1[0], p2[1] - p1[1]];
-    const normal: Point = [-edge[1], edge[0]];
-    const length = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1]);
-    axes.push([normal[0] / length, normal[1] / length]);
-  }
-  return axes;
-}
 
-function project(rect: Rectangle, axis: Point): [number, number] {
-  // 将矩形投影到轴上
-  const dots = rect.map((point) => point[0] * axis[0] + point[1] * axis[1]);
-  return [Math.min(...dots), Math.max(...dots)];
-}
-
-function overlap(proj1: [number, number], proj2: [number, number]): boolean {
-  // 检测两个投影是否重叠
-  return !(proj1[1] <= proj2[0] || proj2[1] <= proj1[0]);
-}
 
 export function getRectFromTopLeft(
   x = 0,
@@ -94,8 +72,29 @@ export interface RectBasicInfo {
   width: number;
   height: number;
   deg?: number;
+  isRadius?: boolean;
 }
-
+export interface ICircle {
+  x: number;
+  y: number;
+  radius: number;
+}
+export const transToCircle = (info: RectBasicInfo): ICircle => {
+  return {
+    x: info.x + info.width / 2,
+    y: info.y + info.height / 2,
+    radius: info.width / 2,
+  };
+};
+export const transToVectorRect = (info: RectBasicInfo): IVectorPoint[] => {
+  const rect = transToRect(info);
+  return rect.map(([x, y]) => {
+    return {
+      x,
+      y,
+    };
+  });
+};
 export const transToRect = ({
   x = 0,
   y = 0,
@@ -107,133 +106,91 @@ export const transToRect = ({
   return rotateRectangle(rect, deg);
 };
 
-export function satCollision(rect1: Rectangle, rect2: Rectangle): boolean {
-  // 使用SAT算法检测两个矩形是否相交
-  const axes1 = getAxes(rect1);
-  const axes2 = getAxes(rect2);
-  const axes = [...axes1, ...axes2];
-
-  for (const axis of axes) {
-    const proj1 = project(rect1, axis);
-    const proj2 = project(rect2, axis);
-    if (!overlap(proj1, proj2)) {
-      return false;
-    }
+function circleRectCollision(circle: ICircle, rectangle: IVectorPoint[]) {
+  if (rectangle.length !== 4) {
+    throw new Error("Rectangle must have exactly 4 points.");
   }
-  return true;
+  let edge 
+
+  // 检查最近点方法：找到距离圆心最近的矩形边上的点
+  let closestPoint: IVectorPoint = { x: circle.x, y: circle.y };
+  let minDistanceSquared = Infinity;
+
+  rectangle.forEach((point, i) => {
+    const nextPoint = rectangle[(i + 1) % 4]; // 获取矩形边的端点
+
+    // 计算圆心到矩形边的最近点
+    const closest = getClosestPointOnLineSegment(circle, point, nextPoint);
+
+    // 计算距离平方，避免浮点计算开销
+    const distanceSquared = (closest.x - circle.x) ** 2 + (closest.y - circle.y) ** 2;
+
+    if (distanceSquared < minDistanceSquared) {
+      closestPoint = closest;
+      minDistanceSquared = distanceSquared;
+      edge = {
+        x: nextPoint.x - point.x,
+        y: nextPoint.y - point.y
+      }
+    }
+  });
+
+  // 判断最近距离是否小于等于圆的半径平方
+  return {
+    isCollision: minDistanceSquared <= circle.radius ** 2,
+    vector: edge
+  }
 }
+
+/**
+ * 计算点到线段上的最近点
+ */
+function getClosestPointOnLineSegment(circle: ICircle, pointA: IVectorPoint, pointB: IVectorPoint): IVectorPoint {
+  const dx = pointB.x - pointA.x;
+  const dy = pointB.y - pointA.y;
+  const lengthSquared = dx ** 2 + dy ** 2;
+
+  if (lengthSquared === 0) return pointA; // 线段退化为点
+
+  // 投影圆心到线段上的比例参数 t
+  let t = ((circle.x - pointA.x) * dx + (circle.y - pointA.y) * dy) / lengthSquared;
+
+  // 限制 t 在 [0, 1] 之间
+  t = Math.max(0, Math.min(1, t));
+
+  return { x: pointA.x + t * dx, y: pointA.y + t * dy };
+}
+
 
 export const checkRectSatCollission = (
   info1: RectBasicInfo,
   info2: RectBasicInfo
 ) => {
-  const rect1 = transToRect(info1);
-  const rect2 = transToRect(info2);
-  return satCollision(rect1, rect2);
+  // 两个矩形
+  if (!info1.isRadius && !info2.isRadius) {
+    const rect1 = transToRect(info1);
+    const rect2 = transToRect(info2);
+    return {
+      isCollision: satCollision(rect1, rect2),
+      vector: {
+        x: 0,
+        y: 0
+      }
+    }
+  }
+  // 两个圆
+  if (info1.isRadius && info2.isRadius) {
+  }
+  // 一圆一方
+  const circle = transToCircle(info1.isRadius ? info1 : info2);
+  const rect = transToVectorRect(info1.isRadius ? info2 : info1);
+  return circleRectCollision(circle, rect);
 };
 
 interface IVectorPoint {
   x: number;
   y: number;
 }
-interface IVectorRectangle {
-  corners: IVectorPoint[]; // 矩形的四个顶点顺序为：左上，右上，右下，左下
-}
-function vectorSubtract(a: IVectorPoint, b: IVectorPoint): IVectorPoint {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
 
-function vectorAdd(a: IVectorPoint, b: IVectorPoint): IVectorPoint {
-  return { x: a.x + b.x, y: a.y + b.y };
-}
 
-function vectorDot(a: IVectorPoint, b: IVectorPoint): number {
-  return a.x * b.x + a.y * b.y;
-}
 
-function vectorScale(v: IVectorPoint, s: number): IVectorPoint {
-  return { x: v.x * s, y: v.y * s };
-}
-
-function vectorLength(v: IVectorPoint): number {
-  return Math.sqrt(v.x * v.x + v.y * v.y);
-}
-
-function getShortestVectorToEdge(
-  point: IVectorPoint,
-  edgeStart: IVectorPoint,
-  edgeEnd: IVectorPoint
-): IVectorPoint {
-  const edgeVector = vectorSubtract(edgeEnd, edgeStart);
-  const pointVector = vectorSubtract(point, edgeStart);
-  const edgeLengthSquared = vectorDot(edgeVector, edgeVector);
-  const t = Math.max(
-    0,
-    Math.min(1, vectorDot(pointVector, edgeVector) / edgeLengthSquared)
-  );
-  const projection = vectorAdd(edgeStart, vectorScale(edgeVector, t));
-  return vectorSubtract(projection, point);
-}
-
-export function getShortestVector(
-  point: IVectorPoint,
-  rect: IVectorRectangle
-): IVectorPoint {
-  let shortestVector: IVectorPoint = getShortestVectorToEdge(
-    point,
-    rect.corners[0],
-    rect.corners[1]
-  );
-  let shortestDistance = vectorLength(shortestVector);
-
-  for (let i = 1; i < rect.corners.length; i++) {
-    const edgeStart = rect.corners[i];
-    const edgeEnd = rect.corners[(i + 1) % rect.corners.length];
-    const vectorToEdge = getShortestVectorToEdge(point, edgeStart, edgeEnd);
-    const distanceToEdge = vectorLength(vectorToEdge);
-
-    if (distanceToEdge < shortestDistance) {
-      shortestVector = vectorToEdge;
-      shortestDistance = distanceToEdge;
-    }
-  }
-  return shortestVector;
-}
-
-function vectorNormalize(v: IVectorPoint): IVectorPoint {
-  const length = vectorLength(v);
-  return { x: v.x / length, y: v.y / length };
-}
-function reflectVector(v: IVectorPoint, normal: IVectorPoint): IVectorPoint {
-  const dotProduct = vectorDot(v, normal);
-  const scaledNormal = vectorScale(normal, 2 * dotProduct);
-  return vectorSubtract(v, scaledNormal);
-}
-
-export function getReflectedAngle(dir: number, wallVector: IVectorPoint): number {
-  // 将dir转换为弧度
-  const dirRadians = dir * (Math.PI / 180);
-
-  // 子弹的初始方向向量
-  const bulletVector: IVectorPoint = {
-    x: Math.cos(dirRadians),
-    y: Math.sin(dirRadians),
-  };
-
-  // 墙面的法线向量
-  const normal = vectorNormalize({ x: -wallVector.y, y: wallVector.x });
-
-  // 计算反射后的方向向量
-  const reflectedVector = reflectVector(bulletVector, normal);
-
-  // 计算反射后的角度
-  let reflectedAngle =
-    Math.atan2(reflectedVector.y, reflectedVector.x) * (180 / Math.PI);
-
-  // 确保反射角度在0-360度范围内
-  if (reflectedAngle < 0) {
-    reflectedAngle += 360;
-  }
-  
-  return reflectedAngle;
-}

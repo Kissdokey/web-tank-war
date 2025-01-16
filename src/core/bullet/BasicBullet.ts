@@ -12,10 +12,12 @@ export class BasicBullet {
     dir: number
     maxRange: number
     maxReflection: number
+    isRadius: boolean
     constructor(bullet: IBasicBullet) {
         this.id = bullet.id || getUuid()
-        this.x = bullet.x 
-        this.y = bullet.y 
+        this.x = bullet.x || 0
+        this.y = bullet.y  || 0
+        this.isRadius = true
         this.size = bullet.size || INITIAL_BULLET_SIZE
         this.damage = bullet.damage || INITIAL_BULLET_DAMAGE
         this.speed = bullet.speed || INITIAL_BULLET_SPEED

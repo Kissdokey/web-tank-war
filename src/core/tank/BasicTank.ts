@@ -28,6 +28,7 @@ export class BasicTank {
   height: number
   attackInterval: number
   maxHealth: number
+  isRadius: boolean
   constructor(initial?: ITank) {
     this.id = initial?.id || getUuid();
     this.name = initial?.name || "tank";
@@ -45,6 +46,7 @@ export class BasicTank {
     this.x = initial?.x || 0;
     this.y = initial?.y || 0;
     this.attackInterval = initial?.attackInterval || INITIAL_TANK_ATTACK_INTERVAL
+    this.isRadius = false
   }
   rotate() {
     // 前置判断是否可以旋转,按照一帧约16ms旋转角度来进行旋转, 包括旋转后是否会和墙碰撞，坦克实时会动，移动前检测碰撞无用

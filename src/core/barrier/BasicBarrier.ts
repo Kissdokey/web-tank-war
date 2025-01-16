@@ -10,6 +10,7 @@ export class BasicBarrier {
     isInvissible?: boolean 
     width: number
     height: number
+    isRadius: boolean
     constructor(info: IBasicBarrier) {
         this.id = info.id || getUuid()
         this.x = info.x || 0
@@ -18,5 +19,6 @@ export class BasicBarrier {
         this.isInvissible = info.isInvissible || true
         this.width = info.width || INITIAL_BARRIER_WIDTH
         this.height = info.height || INITIAL_BARRIER_HEIGHT
+        this.isRadius = false
     }
 }
